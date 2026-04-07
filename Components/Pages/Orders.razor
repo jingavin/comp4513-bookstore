@@ -1,0 +1,64 @@
+@page "/myorders"
+@implements IAsyncDisposable
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<BookstoreDb> DBFactory
+@rendermode InteractiveServer
+
+<PageTitle>Bookstore - My Orders</PageTitle>
+
+<div class="container-fluid mt-3">
+    @if (orders is null)
+    {
+        <p>Loading...</p>
+    }
+    else if (!orders.Any())
+    {
+        <p>No orders have been placed yet.</p>
+    }
+    else
+    {
+        @foreach (var order in orders)
+        {
+            <div class="py-3 border-bottom">
+                <h2 class="mb-2">@order.OrderDate.ToString("MMMM d, yyyy")</h2>
+
+                @foreach (var item in order.OrderItems)
+                {
+                    <div class="row mb-1">
+                        <div class="col-4">
+                            <strong>@item.Book.Title (@item.Quantity):</strong>
+                        </div>
+                        <div class="col">
+                            $@item.GetTotal().ToString("0.00")
+                        </div>
+                    </div>
+                }
+
+                <div class="mt-2 text-muted">
+                    Total (@order.OrderItems.Sum(i => i.Quantity)) : $@order.GetTotal().ToString("0.00")
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private BookstoreDb context { get; set; }
+    private List<Order> orders { get; set; }
+
+    protected override void OnInitialized()
+    {
+        context = DBFactory.CreateDbContext();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        orders = await context.Orders
+            .Include(o => o.OrderItems)
+            .ThenInclude(i => i.Book)
+            .OrderBy(o => o.OrderDate)
+            .ToListAsync();
+    }
+
+    public async ValueTask DisposeAsync() => await context.DisposeAsync();
+}
